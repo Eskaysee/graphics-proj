@@ -4,8 +4,12 @@
 #include "SDL.h"
 #include <GL/glew.h>
 
+
 #include "glwindow.h"
 #include "geometry.h"
+
+#include "glm/gtc/matrix_transform.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 using namespace std;
 
@@ -78,7 +82,6 @@ GLuint loadShaderProgram(const char* vertShaderFilename,
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
 
-
     GLint linkStatus;
     glGetProgramiv(program, GL_LINK_STATUS, &linkStatus);
     if(linkStatus != GL_TRUE)
@@ -93,7 +96,9 @@ GLuint loadShaderProgram(const char* vertShaderFilename,
     return program;
 }
 
-OpenGLWindow::OpenGLWindow(){}
+OpenGLWindow::OpenGLWindow()
+{
+}
 
 
 void OpenGLWindow::initGL()
@@ -151,6 +156,10 @@ void OpenGLWindow::initGL()
     int colorLoc = glGetUniformLocation(shader, "objectColor");
     glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
 
+    glm::mat4 trans = glm::mat4(1.0f);
+    GLint uniTrans = glGetUniformLocation(shader, "trans");
+    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+
     // Load the model that we want to use and buffer the vertex attributes
     //GeometryData geometry = loadOBJFile("tri.obj");
 
@@ -160,17 +169,16 @@ void OpenGLWindow::initGL()
     glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, 3*geometry.vertexCount()*sizeof(float), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, false, 0, 0);
+    glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, false, 0, vertices);
     glEnableVertexAttribArray(vertexLoc);
+    
+    // glm::vec3 camPos = glm::vec3(0.0f,0.0f,3.0f);
+    // glm::vec3 camFront = glm::vec3(0.0f,0.0f,0.0f);
+    // glm::vec3 camUp =  glm::vec3(0.0f,0.0f,1.0f);
 
-    // glVertex3d camPos = glVertex3d(0.0f,0.0f,3.0f);
-    // glVertex3d camFront = glVertex3d(0.0f,0.0f,-1.0f);
-    // glVertex3d camUp = glVertex3d(0.0f,0.1f,0.0f);
-
-    //gluLookAt(0.0f,0.0f,3.0f,0.0f,0.0f,-1.0f,0.0f,0.1f,0.0f);
+    //glm::lookAt(camPos, camFront, camUp);
 
     glPrintError("Setup complete", true);
-
     render();
     menuUI();
 }
@@ -178,7 +186,6 @@ void OpenGLWindow::initGL()
 void OpenGLWindow::render()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-     
 
     glDrawArrays(GL_TRIANGLES, 0, geometry.vertexCount());
 
@@ -200,12 +207,14 @@ bool OpenGLWindow::handleEvent(SDL_Event e)
             return false;
         }
         else if (!mainMenu){
+            glm::mat4 trans = glm::mat4(1.0f);
+            GLint colorLoc = glGetUniformLocation(shader, "objectColor");
+            GLint uniTrans = glGetUniformLocation(shader, "trans");
             if (e.key.keysym.sym == SDLK_q){
                 mainMenu = true;
                 menuUI();
             }
             else if (menuOption == 'c' || menuOption == 'C'){
-                int colorLoc = glGetUniformLocation(shader, "objectColor");
                 if (e.key.keysym.sym == SDLK_w){
                     glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);    //white
                 }
@@ -231,11 +240,33 @@ bool OpenGLWindow::handleEvent(SDL_Event e)
                     glUniform3f(colorLoc, 0.0f, 1.0f, 1.0f);    //cyan
                 }
             }
-            else if (menuOption == 't' || menuOption == 'T'){
-                if (e.key.keysym.sym == SDLK_s){}
-                else if (e.key.keysym.sym == SDLK_t){}
-                else if (e.key.keysym.sym == SDLK_r){}
-                else if (e.key.keysym.sym == SDLK_d){}
+            else if (menuOption == 's' || menuOption == 'S'){
+                if (e.key.keysym.sym == SDLK_KP_PLUS || e.key.keysym.sym == SDLK_PLUS || e.key.keysym.sym == SDLK_EQUALS){
+                    trans = glm::scale(trans, glm::vec3(2.0f, 2.0f, 2.0f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_MINUS){
+                    trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+            }
+            else if (menuOption == 't' || menuOption == 'T') { 
+                if (e.key.keysym.sym == SDLK_LEFT){
+                    trans = glm::translate(trans, glm::vec3(-0.5f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_RIGHT){
+                    trans = glm::translate(trans, glm::vec3(0.5f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_UP){
+                    trans = glm::translate(trans, glm::vec3(0.0f, 0.5f, 0.0f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_DOWN){
+                    trans = glm::translate(trans, glm::vec3(0.0f, -0.5f, 0.0f));
+                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                }
             }
             else if (menuOption == 'h' || menuOption == 'H'){}
         }
@@ -259,10 +290,22 @@ void OpenGLWindow::menuUI(){
         mainMenu = false;
     }
     else if (menuOption == 't' || menuOption == 'T'){
-        cout << "TRANSFORM: enter in gui\n";
+        cout << "TRANSFORM: type in terminal\n";
         cout << "[S]cale\n[T]ranslate\n[R]otate\n[D]Shear" << endl;
-        cout << "Press \"q\" to go back to main menu options\n" << endl;
-        mainMenu = false;
+        cin >> menuOption;
+        cout << endl;
+        if (menuOption == 'T' || menuOption == 't') {
+            mainMenu = false;
+            cout << "Use direction keys in GUI\n";
+            cout << "Press \"q\" to go back to main menu options\n" << endl;
+        }
+        else if (menuOption == 'S' || menuOption == 's') {
+            mainMenu = false;
+            cout << "In the GUI enter:" << endl;
+            cout << "\"+\" to double the object size" << endl;
+            cout << "\"-\" to half the object size" << endl;
+            cout << "Press \"q\" to go back to main menu options\n" << endl;
+        }
     }
     else if (menuOption == 'h' || menuOption == 'H'){
         cout << "COMPOUND TRANSFORMATION:\n";

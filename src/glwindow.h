@@ -3,6 +3,8 @@
 
 #include <GL/glew.h>
 
+#include "glm/glm.hpp"
+
 #include "geometry.h"
 
 class OpenGLWindow
