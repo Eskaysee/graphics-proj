@@ -1,3 +1,6 @@
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <iostream>
 #include <stdio.h>
 
@@ -98,8 +101,23 @@ GLuint loadShaderProgram(const char* vertShaderFilename,
 
 OpenGLWindow::OpenGLWindow()
 {
+    trans = glm::mat4(1.0f);
+    geometry.loadFromOBJFile("objects/cube/cube.obj");
 }
 
+void GLAPIENTRY
+MessageCallback( GLenum source,
+                 GLenum type,
+                 GLuint id,
+                 GLenum severity,
+                 GLsizei length,
+                 const GLchar* message,
+                 const void* userParam )
+{
+  fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
 
 void OpenGLWindow::initGL()
 {
@@ -111,7 +129,7 @@ void OpenGLWindow::initGL()
 
     sdlWin = SDL_CreateWindow("OpenGL Prac 1",
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                              640, 480, SDL_WINDOW_OPENGL);
+                              1280, 720, SDL_WINDOW_OPENGL);
     if(!sdlWin)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Error", "Unable to create window", 0);
@@ -141,6 +159,8 @@ void OpenGLWindow::initGL()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    //glEnable(GL_DEBUG_OUTPUT);
+    //glDebugMessageCallback( MessageCallback, 0 );
     glCullFace(GL_BACK);
     glClearColor(0,0,0,1);
 
@@ -156,27 +176,67 @@ void OpenGLWindow::initGL()
     int colorLoc = glGetUniformLocation(shader, "objectColor");
     glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
 
-    glm::mat4 trans = glm::mat4(1.0f);
-    GLint uniTrans = glGetUniformLocation(shader, "trans");
-    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
-
     // Load the model that we want to use and buffer the vertex attributes
     //GeometryData geometry = loadOBJFile("tri.obj");
 
-    geometry.loadFromOBJFile("objects/tri2.obj");
-    int vertexLoc = glGetAttribLocation(shader, "position");
+    GLint vertexLoc = glGetAttribLocation(shader, "position");
     GLfloat* vertices = (float *)geometry.vertexData();
-    glGenBuffers(1, &vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glGenBuffers(2, buffers);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
     glBufferData(GL_ARRAY_BUFFER, 3*geometry.vertexCount()*sizeof(float), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, false, 0, vertices);
+    glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, false,  0, (void*)0);
     glEnableVertexAttribArray(vertexLoc);
-    
-    // glm::vec3 camPos = glm::vec3(0.0f,0.0f,3.0f);
-    // glm::vec3 camFront = glm::vec3(0.0f,0.0f,0.0f);
-    // glm::vec3 camUp =  glm::vec3(0.0f,0.0f,1.0f);
 
-    //glm::lookAt(camPos, camFront, camUp);
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    // set the texture wrapping/filtering options (on the currently bound texture object)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load and generate the texture
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("objects/cube/crate.jpg", &width, &height, &nrChannels, 0);
+    if (data) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data); 
+        
+    GLint textLoc = glGetAttribLocation(shader, "vText");
+    GLfloat* textureCoord = (float*)geometry.textureCoordData();
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+    glBufferData(GL_ARRAY_BUFFER, 2*geometry.vertexCount()*sizeof(float), textureCoord, GL_STATIC_DRAW);
+    glVertexAttribPointer(textLoc, 2, GL_INT, true,  0, 0);
+    glEnableVertexAttribArray(textLoc);
+
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindVertexArray(vao);
+
+    // GLint normLoc = glGetAttribLocation(shader, "normal");
+    // GLfloat* normalData = (float*)geometry.normalData();
+    // glBindBuffer(GL_ARRAY_BUFFER, buffers[2]);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(normalData), normalData, GL_STATIC_DRAW);
+    // glEnableVertexAttribArray(2);
+    // glVertexAttribPointer(normLoc, 3, GL_FLOAT, false, 0, 0);
+
+    
+    glm::vec3 camPos = glm::vec3(0.0f,0.0f,2.0f);
+    glm::vec3 camFront = glm::vec3(0.0f,0.0f,0.0f);
+    glm::vec3 camUp =  glm::vec3(0.0f,1.0f,0.0f);
+
+    glm::mat4 model = glm::mat4(1.0f);
+    glm ::mat4 view = glm::lookAt(camPos, camFront, camUp);
+    glm::mat4 projection = glm::perspective(52.5f, (4.0f/3.0f), 0.1f, 75.0f);
+    GLint modLoc = glGetUniformLocation(shader, "model");
+    glUniformMatrix4fv(modLoc, 1, GL_FALSE, glm::value_ptr(model));
+    GLint viewLoc = glGetUniformLocation(shader, "view");
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+    GLint projLoc = glGetUniformLocation(shader, "projection");
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
     glPrintError("Setup complete", true);
     render();
@@ -188,6 +248,7 @@ void OpenGLWindow::render()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glDrawArrays(GL_TRIANGLES, 0, geometry.vertexCount());
+    //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     // Swap the front and back buffers on the window, effectively putting what we just "drew"
     // onto the screen (whereas previously it only existed in memory)
@@ -207,9 +268,8 @@ bool OpenGLWindow::handleEvent(SDL_Event e)
             return false;
         }
         else if (!mainMenu){
-            glm::mat4 trans = glm::mat4(1.0f);
             GLint colorLoc = glGetUniformLocation(shader, "objectColor");
-            GLint uniTrans = glGetUniformLocation(shader, "trans");
+            GLint transLoc = glGetUniformLocation(shader, "model");
             if (e.key.keysym.sym == SDLK_q){
                 mainMenu = true;
                 menuUI();
@@ -243,29 +303,47 @@ bool OpenGLWindow::handleEvent(SDL_Event e)
             else if (menuOption == 's' || menuOption == 'S'){
                 if (e.key.keysym.sym == SDLK_KP_PLUS || e.key.keysym.sym == SDLK_PLUS || e.key.keysym.sym == SDLK_EQUALS){
                     trans = glm::scale(trans, glm::vec3(2.0f, 2.0f, 2.0f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
                 else if (e.key.keysym.sym == SDLK_MINUS){
                     trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
             }
             else if (menuOption == 't' || menuOption == 'T') { 
                 if (e.key.keysym.sym == SDLK_LEFT){
                     trans = glm::translate(trans, glm::vec3(-0.5f, 0.0f, 0.0f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
                 else if (e.key.keysym.sym == SDLK_RIGHT){
                     trans = glm::translate(trans, glm::vec3(0.5f, 0.0f, 0.0f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
                 else if (e.key.keysym.sym == SDLK_UP){
                     trans = glm::translate(trans, glm::vec3(0.0f, 0.5f, 0.0f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
                 else if (e.key.keysym.sym == SDLK_DOWN){
                     trans = glm::translate(trans, glm::vec3(0.0f, -0.5f, 0.0f));
-                    glUniformMatrix4fv(uniTrans, 1, GL_FALSE, glm::value_ptr(trans));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+            }
+            else if (menuOption == 'R' || menuOption == 'r'){
+                if (e.key.keysym.sym == SDLK_LEFT){
+                    trans = glm::rotate(trans, glm::radians(22.5f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_RIGHT){
+                    trans = glm::rotate(trans, glm::radians(-22.5f), glm::vec3(0.0f, 1.0f, 0.0f));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_UP){
+                    trans = glm::rotate(trans, glm::radians(-22.5f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
+                }
+                else if (e.key.keysym.sym == SDLK_DOWN){
+                    trans = glm::rotate(trans, glm::radians(22.5f), glm::vec3(1.0f, 0.0f, 0.0f));
+                    glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
                 }
             }
             else if (menuOption == 'h' || menuOption == 'H'){}
@@ -277,7 +355,8 @@ bool OpenGLWindow::handleEvent(SDL_Event e)
 void OpenGLWindow::menuUI(){
     if (mainMenu) {
         cout << "MAIN MENU: type in terminal\n";
-        cout << "Press \"c\" for colour change\nPress \"t\" for transformation\nPress \"h\" for compound transformation" << endl;
+        cout << "Press \"c\" for colour change\nPress \"t\" for transformation\
+        \nPress\"h\" for compound transformation\nPress \"r\" to reset object" << endl;
         cin >> menuOption;
     }
     cout << endl;
@@ -306,17 +385,33 @@ void OpenGLWindow::menuUI(){
             cout << "\"-\" to half the object size" << endl;
             cout << "Press \"q\" to go back to main menu options\n" << endl;
         }
+        else if (menuOption == 'R' || menuOption == 'r'){
+            mainMenu = false;
+            cout << "In the GUI enter:" << endl;
+            cout << "left or right arrow key to rotate about the y axis" << endl;
+            cout << "up or down arrow key to rotate about the x axis" << endl;
+            cout << "Press \"q\" to go back to main menu options\n" << endl;
+        }
     }
     else if (menuOption == 'h' || menuOption == 'H'){
         cout << "COMPOUND TRANSFORMATION:\n";
         cout << "Press \"q\" to go back to main menu options\n" << endl;
         mainMenu = false;
     }
+    else if (menuOption == 'r' || menuOption == 'R'){
+        mainMenu = true;
+        GLint transLoc = glGetUniformLocation(shader, "model");
+        GLint colorLoc = glGetUniformLocation(shader, "objectColor");
+        trans = glm::mat4(1.0f);
+        glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
+        glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
+    }
 }
 
 void OpenGLWindow::cleanup()
 {
-    glDeleteBuffers(1, &vertexBuffer);
+    glDeleteTextures(1, &texture);
+    glDeleteBuffers(2, buffers);
     glDeleteVertexArrays(1, &vao);
     SDL_DestroyWindow(sdlWin);
 }

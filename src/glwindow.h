@@ -21,9 +21,13 @@ private:
     SDL_Window* sdlWin;
     GLuint vao;
     GLuint shader;
-    GLuint vertexBuffer;
+    GLuint texture;
+
+    GLuint buffers[2];//, normalBuffer};
+    
 
     GeometryData geometry;
+    glm::mat4 trans;
     bool mainMenu=true;
     char menuOption;
     void menuUI();
