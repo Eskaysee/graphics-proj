@@ -164,8 +164,8 @@ void OpenGLWindow::initGL()
     glCullFace(GL_BACK);
     glClearColor(0,0,0,1);
 
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    glGenVertexArrays(2, vao);
+    glBindVertexArray(vao[0]);
 
     // Note that this path is relative to your working directory
     // when running the program (IE if you run from within build
@@ -181,40 +181,52 @@ void OpenGLWindow::initGL()
 
     GLint vertexLoc = glGetAttribLocation(shader, "position");
     GLfloat* vertices = (float *)geometry.vertexData();
-    glGenBuffers(2, buffers);
+    glGenBuffers(3, buffers);
     glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
     glBufferData(GL_ARRAY_BUFFER, 3*geometry.vertexCount()*sizeof(float), vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(vertexLoc, 3, GL_FLOAT, false,  0, (void*)0);
     glEnableVertexAttribArray(vertexLoc);
 
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    // set the texture wrapping/filtering options (on the currently bound texture object)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load and generate the texture
-    int width, height, nrChannels;
-    unsigned char *data = stbi_load("objects/cube/crate.jpg", &width, &height, &nrChannels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else {
-        std::cout << "Failed to load texture" << std::endl;
-    }
-    stbi_image_free(data); 
-        
-    GLint textLoc = glGetAttribLocation(shader, "vText");
-    GLfloat* textureCoord = (float*)geometry.textureCoordData();
-    glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
-    glBufferData(GL_ARRAY_BUFFER, 2*geometry.vertexCount()*sizeof(float), textureCoord, GL_STATIC_DRAW);
-    glVertexAttribPointer(textLoc, 2, GL_INT, true,  0, 0);
-    glEnableVertexAttribArray(textLoc);
+    if (geometry.hasTextCoords()){
+        GLint textBool = glGetUniformLocation(shader, "isText");
+        glUniform1i(textBool, 1);       //SET TO ZERO TO DEACTIVATE TEXTURING
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        // set the texture wrapping/filtering options (on the currently bound texture object)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // load and generate the texture
+        int width, height, nrChannels;
+        unsigned char *data = stbi_load("objects/cube/crate.jpg", &width, &height, &nrChannels, 0);
+        if (data) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else {
+            std::cout << "Failed to load texture" << std::endl;
+        }
+        stbi_image_free(data); 
+            
+        GLint textLoc = glGetAttribLocation(shader, "vText");
+        GLfloat* textureCoord = (float*)geometry.textureCoordData();
+        glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+        glBufferData(GL_ARRAY_BUFFER, 2*geometry.vertexCount()*sizeof(float), textureCoord, GL_STATIC_DRAW);
+        glVertexAttribPointer(textLoc, 2, GL_FLOAT, true,  0, 0);
+        glEnableVertexAttribArray(textLoc);
 
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glBindVertexArray(vao);
+        GLint normLoc = glGetAttribLocation(shader, "norms");
+        cout << normLoc << "\n" << endl;
+        GLfloat* normals = (float*)geometry.normalData();
+        glBindBuffer(GL_ARRAY_BUFFER, buffers[2]);
+        glBufferData(GL_ARRAY_BUFFER, 3*geometry.vertexCount()*sizeof(float), normals, GL_STATIC_DRAW);
+        glVertexAttribPointer(2, 3, GL_FLOAT, true,  0, 0);
+        glEnableVertexAttribArray(2);
+
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindVertexArray(vao[0]);
+    }
 
     // GLint normLoc = glGetAttribLocation(shader, "normal");
     // GLfloat* normalData = (float*)geometry.normalData();
@@ -224,19 +236,33 @@ void OpenGLWindow::initGL()
     // glVertexAttribPointer(normLoc, 3, GL_FLOAT, false, 0, 0);
 
     
-    glm::vec3 camPos = glm::vec3(0.0f,0.0f,2.0f);
+    glm::vec3 camPos = glm::vec3(0.0f,0.0f,3.0f);
     glm::vec3 camFront = glm::vec3(0.0f,0.0f,0.0f);
     glm::vec3 camUp =  glm::vec3(0.0f,1.0f,0.0f);
 
     glm::mat4 model = glm::mat4(1.0f);
     glm ::mat4 view = glm::lookAt(camPos, camFront, camUp);
-    glm::mat4 projection = glm::perspective(52.5f, (4.0f/3.0f), 0.1f, 75.0f);
+    glm::mat4 projection = glm::perspective(90.0f, (4.0f/3.0f), 0.1f, 75.0f);
     GLint modLoc = glGetUniformLocation(shader, "model");
     glUniformMatrix4fv(modLoc, 1, GL_FALSE, glm::value_ptr(model));
     GLint viewLoc = glGetUniformLocation(shader, "view");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     GLint projLoc = glGetUniformLocation(shader, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+    // //unsigned int lightVAO; 
+    // unsigned int VBO;
+    // //glGenVertexArrays(1, &lightVAO);
+    // glBindVertexArray(vao[1]);
+    // // we only need to bind to the VBO, the container's VBO's data already contains the data.
+    // glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+    // glm::mat4 model2 = glm::mat4(1.0f);
+    // glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+    // model2 = glm::translate(model, lightPos);
+    // model2 = glm::scale(model, glm::vec3(0.2f)); 
+    // // set the vertex attribute 
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // glEnableVertexAttribArray(0);
 
     glPrintError("Setup complete", true);
     render();
@@ -412,6 +438,6 @@ void OpenGLWindow::cleanup()
 {
     glDeleteTextures(1, &texture);
     glDeleteBuffers(2, buffers);
-    glDeleteVertexArrays(1, &vao);
+    glDeleteVertexArrays(2, vao);
     SDL_DestroyWindow(sdlWin);
 }
