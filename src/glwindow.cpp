@@ -159,8 +159,8 @@ void OpenGLWindow::initGL()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    //glEnable(GL_DEBUG_OUTPUT);
-    //glDebugMessageCallback( MessageCallback, 0 );
+    // glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback( MessageCallback, 0 );
     glCullFace(GL_BACK);
     glClearColor(0,0,0,1);
 
@@ -174,7 +174,7 @@ void OpenGLWindow::initGL()
     glUseProgram(shader);
 
     int colorLoc = glGetUniformLocation(shader, "objectColor");
-    glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
+    glUniform3f(colorLoc, 0.5f, 0.5f, 0.5f);
 
     // Load the model that we want to use and buffer the vertex attributes
     //GeometryData geometry = loadOBJFile("tri.obj");
@@ -189,7 +189,7 @@ void OpenGLWindow::initGL()
 
     if (geometry.hasTextCoords()){
         GLint textBool = glGetUniformLocation(shader, "isText");
-        glUniform1i(textBool, 1);       //SET TO ZERO TO DEACTIVATE TEXTURING
+        glUniform1i(textBool, 0);       //SET TO ZERO TO DEACTIVATE TEXTURING
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
         // set the texture wrapping/filtering options (on the currently bound texture object)
@@ -217,7 +217,6 @@ void OpenGLWindow::initGL()
         glEnableVertexAttribArray(textLoc);
 
         GLint normLoc = glGetAttribLocation(shader, "norms");
-        cout << normLoc << "\n" << endl;
         GLfloat* normals = (float*)geometry.normalData();
         glBindBuffer(GL_ARRAY_BUFFER, buffers[2]);
         glBufferData(GL_ARRAY_BUFFER, 3*geometry.vertexCount()*sizeof(float), normals, GL_STATIC_DRAW);
@@ -225,44 +224,48 @@ void OpenGLWindow::initGL()
         glEnableVertexAttribArray(2);
 
         glBindTexture(GL_TEXTURE_2D, texture);
-        glBindVertexArray(vao[0]);
     }
-
-    // GLint normLoc = glGetAttribLocation(shader, "normal");
-    // GLfloat* normalData = (float*)geometry.normalData();
-    // glBindBuffer(GL_ARRAY_BUFFER, buffers[2]);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(normalData), normalData, GL_STATIC_DRAW);
-    // glEnableVertexAttribArray(2);
-    // glVertexAttribPointer(normLoc, 3, GL_FLOAT, false, 0, 0);
-
     
-    glm::vec3 camPos = glm::vec3(0.0f,0.0f,3.0f);
+    glm::vec3 camPos = glm::vec3(0.5f,-2.0f,3.0f);
     glm::vec3 camFront = glm::vec3(0.0f,0.0f,0.0f);
     glm::vec3 camUp =  glm::vec3(0.0f,1.0f,0.0f);
 
     glm::mat4 model = glm::mat4(1.0f);
     glm ::mat4 view = glm::lookAt(camPos, camFront, camUp);
-    glm::mat4 projection = glm::perspective(90.0f, (4.0f/3.0f), 0.1f, 75.0f);
+    glm::mat4 projection = glm::perspective(52.5f, (4.0f/3.0f), 0.1f, 75.0f);
     GLint modLoc = glGetUniformLocation(shader, "model");
     glUniformMatrix4fv(modLoc, 1, GL_FALSE, glm::value_ptr(model));
     GLint viewLoc = glGetUniformLocation(shader, "view");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     GLint projLoc = glGetUniformLocation(shader, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    glBindVertexArray(vao[0]);
 
-    // //unsigned int lightVAO; 
-    // unsigned int VBO;
-    // //glGenVertexArrays(1, &lightVAO);
-    // glBindVertexArray(vao[1]);
-    // // we only need to bind to the VBO, the container's VBO's data already contains the data.
-    // glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
-    // glm::mat4 model2 = glm::mat4(1.0f);
-    // glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-    // model2 = glm::translate(model, lightPos);
-    // model2 = glm::scale(model, glm::vec3(0.2f)); 
-    // // set the vertex attribute 
-    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    // glEnableVertexAttribArray(0);
+
+    glBindVertexArray(vao[1]);
+    lightShader = loadShaderProgram("build/light.vert", "build/light.frag");
+    glUseProgram(lightShader);
+    // we only need to bind to the VBO, the container's VBO's data already contains the data.
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+    glm::mat4 model2 = glm::mat4(1.0f);
+    glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+    model2 = glm::translate(model2, lightPos);
+    model2 = glm::scale(model2, glm::vec3(0.2f)); 
+    // set the vertex attribute 
+    glUniform3f(glGetUniformLocation(lightShader, "objectColor"), 1.0f, 1.0f, 0.5f);
+    glUniformMatrix4fv(glGetUniformLocation(lightShader, "model"), 1, GL_FALSE, glm::value_ptr(model2));
+    glUniformMatrix4fv(glGetUniformLocation(lightShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(lightShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,  0, (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(vao[1]);
+
+    glUseProgram(shader);
+    glUniform3f(glGetUniformLocation(shader, "lightCol"), 1.0f, 1.0f, 0.5f);
+    glUniform3fv(glGetUniformLocation(shader,"lightPos"), 1, glm::value_ptr(lightPos));
+    glUniform3f(glGetUniformLocation(shader, "diff"), 0.5f, 0.5f, 0.5f);
+    glUniform3f(glGetUniformLocation(shader, "ambient"), 0.2f, 0.2f, 0.2f);
+    //glUniform3f(glGetUniformLocation(shader, "specular"), );
 
     glPrintError("Setup complete", true);
     render();
@@ -273,8 +276,12 @@ void OpenGLWindow::render()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glUseProgram(lightShader);
+    glBindVertexArray(vao[1]);
     glDrawArrays(GL_TRIANGLES, 0, geometry.vertexCount());
-    //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glUseProgram(shader);
+    glBindVertexArray(vao[0]);
+    glDrawArrays(GL_TRIANGLES, 0, geometry.vertexCount());
 
     // Swap the front and back buffers on the window, effectively putting what we just "drew"
     // onto the screen (whereas previously it only existed in memory)
@@ -382,7 +389,7 @@ void OpenGLWindow::menuUI(){
     if (mainMenu) {
         cout << "MAIN MENU: type in terminal\n";
         cout << "Press \"c\" for colour change\nPress \"t\" for transformation\
-        \nPress\"h\" for compound transformation\nPress \"r\" to reset object" << endl;
+        \nPress \"h\" for compound transformation\nPress \"r\" to reset object" << endl;
         cin >> menuOption;
     }
     cout << endl;
@@ -425,19 +432,21 @@ void OpenGLWindow::menuUI(){
         mainMenu = false;
     }
     else if (menuOption == 'r' || menuOption == 'R'){
-        mainMenu = true;
+        mainMenu = false;
         GLint transLoc = glGetUniformLocation(shader, "model");
         GLint colorLoc = glGetUniformLocation(shader, "objectColor");
         trans = glm::mat4(1.0f);
         glUniformMatrix4fv(transLoc, 1, GL_FALSE, glm::value_ptr(trans));
-        glUniform3f(colorLoc, 1.0f, 1.0f, 1.0f);
+        glUniform3f(colorLoc, 0.5f, 0.5f, 0.5f);
+        mainMenu = true;
+        menuUI();
     }
 }
 
 void OpenGLWindow::cleanup()
 {
     glDeleteTextures(1, &texture);
-    glDeleteBuffers(2, buffers);
+    glDeleteBuffers(3, buffers);
     glDeleteVertexArrays(2, vao);
     SDL_DestroyWindow(sdlWin);
 }

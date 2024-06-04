@@ -10,6 +10,7 @@ uniform mat4 projection;
 uniform int isText;
 
 //out vec4 myVertex;
+out vec3 FragPos;
 out vec3 myNormal;
 out vec2 textCoord;
 
@@ -19,5 +20,5 @@ void main()
     textCoord = vec2(0.0,0.0);
     if (isText>0) textCoord = vText;
     myNormal = mat3(transpose(inverse(model))) * norms;
-    //myVertex = model * vec4(position, 1.0f);
+    FragPos = vec3(view * model * vec4(position, 1.0f));
 }

@@ -19,12 +19,12 @@ public:
 
 private:
     SDL_Window* sdlWin;
-    GLuint vao[2];
     GLuint shader;
+    GLuint lightShader;
     GLuint texture;
 
-    GLuint buffers[3];//, normalBuffer};
-    
+    GLuint buffers[3];
+    GLuint vao[2];
 
     GeometryData geometry;
     glm::mat4 trans;
